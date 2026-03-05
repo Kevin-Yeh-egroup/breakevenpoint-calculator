@@ -131,8 +131,10 @@ const BreakEvenCalculator = () => {
     window.setTimeout(() => {
       setAiInput(sampleCaseText)
       applySampleData()
-      goToResultsTop()
       setIsApplyingExample(false)
+      setNeedsManualConfirm(true)
+      setCurrentStep('manual')
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
     }, 650)
   }
 
