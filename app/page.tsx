@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Separator } from '@/components/ui/separator'
-import { Mic } from 'lucide-react'
+import { Mic, Loader2 } from 'lucide-react'
 import BreakEvenChart from '@/components/BreakEvenChart'
 import {
   AlignmentType,
@@ -125,13 +125,15 @@ const BreakEvenCalculator = () => {
   }
 
   const handleLoadExample = () => {
+    if (isApplyingExample) return
+
     setIsApplyingExample(true)
     window.setTimeout(() => {
       setAiInput(sampleCaseText)
       applySampleData()
       goToResultsTop()
       setIsApplyingExample(false)
-    }, 180)
+    }, 650)
   }
 
   // Handle recording button (simulation)
@@ -374,29 +376,47 @@ const BreakEvenCalculator = () => {
                   onChange={(e) => setAiInput(e.target.value)}
                 />
 
-                <div className="flex gap-3">
-                  <Button
-                    variant="secondary"
-                    className="text-gray-700 transition-transform duration-150 active:scale-95 active:shadow-inner"
-                    onClick={handleLoadExample}
-                    disabled={isApplyingExample}
-                  >
-                    {isApplyingExample ? '載入案例中...' : '參考案例'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    onClick={handleRecord}
-                  >
-                    <Mic className="w-4 h-4" />
-                    {isRecording ? '已開始錄音（示意）' : '語音輸入（示意）'}
-                  </Button>
-                  <Button
-                    onClick={handleAIExtract}
-                    className="bg-blue-600 hover:bg-blue-700 flex-1"
-                  >
-                    整理重點（示意）
-                  </Button>
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="secondary"
+                      className={`text-gray-700 transition-all duration-200 active:scale-95 active:shadow-inner ${
+                        isApplyingExample
+                          ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-300 shadow-md'
+                          : ''
+                      }`}
+                      onClick={handleLoadExample}
+                      disabled={isApplyingExample}
+                    >
+                      {isApplyingExample ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          載入案例中...
+                        </>
+                      ) : (
+                        '參考案例'
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={handleRecord}
+                    >
+                      <Mic className="w-4 h-4" />
+                      {isRecording ? '已開始錄音（示意）' : '語音輸入（示意）'}
+                    </Button>
+                    <Button
+                      onClick={handleAIExtract}
+                      className="bg-blue-600 hover:bg-blue-700 flex-1"
+                    >
+                      整理重點（示意）
+                    </Button>
+                  </div>
+                  {isApplyingExample && (
+                    <p className="text-xs text-amber-700 animate-pulse">
+                      已套用參考案例，正在前往試算結果...
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
