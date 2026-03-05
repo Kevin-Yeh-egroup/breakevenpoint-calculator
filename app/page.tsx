@@ -11,8 +11,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Separator } from '@/components/ui/separator'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { Mic, Check } from 'lucide-react'
+import { Mic } from 'lucide-react'
+import BreakEvenChart from '@/components/BreakEvenChart'
+import {
+  AlignmentType,
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
+} from 'docx'
 
 const BreakEvenCalculator = () => {
   // Main inputs
@@ -40,6 +52,7 @@ const BreakEvenCalculator = () => {
   const [showExamples, setShowExamples] = useState(true)
   const [aiInput, setAiInput] = useState('')
   const [isRecording, setIsRecording] = useState(false)
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
 
   // Calculate derived values
   const unitPriceNum = parseFloat(unitPrice) || 0
@@ -67,15 +80,41 @@ const BreakEvenCalculator = () => {
   const breakEvenRevenue = grossMarginRate > 0 ? fixedCostPerMonth / (grossMarginRate / 100) : 0
   const breakEvenVolume = grossMargin > 0 ? fixedCostPerMonth / grossMargin : 0
 
+  const fmtN = (n: number) => Math.round(n).toLocaleString()
+
+  const sampleCaseText =
+    '我經營手作便當店，每份售價 180 元，每份食材與包材等變動成本約 95 元，每月固定成本約 32,000 元，目前每月大約賣 120 份。'
+
+  const applySampleData = () => {
+    setUnitPrice('180')
+    setMonthlyVolume('120')
+
+    setVarRawMaterial('75')
+    setVarPackaging('12')
+    setVarSupplies('5')
+    setVarShipping('3')
+    setVarOther('0')
+
+    setFixRent('20000')
+    setFixStaff('8000')
+    setFixWater('2500')
+    setFixGas('500')
+    setFixComm('700')
+    setFixLoan('0')
+    setFixOther('300')
+  }
+
   // Mock AI extraction (when user submits)
   const handleAIExtract = () => {
-    // Simulate AI extraction with mock values for demo
-    setUnitPrice('250')
-    setVarRawMaterial('60')
-    setMonthlyVolume('180')
-    setFixRent('12000')
-    setFixWater('3000')
-    setCurrentStep('manual')
+    setAiInput(sampleCaseText)
+    applySampleData()
+    setCurrentStep('results')
+  }
+
+  const handleLoadExample = () => {
+    setAiInput(sampleCaseText)
+    applySampleData()
+    setCurrentStep('results')
   }
 
   // Handle recording button (simulation)
@@ -86,18 +125,208 @@ const BreakEvenCalculator = () => {
     }, 2000)
   }
 
-  // Calculate chart data
-  const chartData = []
-  for (let i = 0; i <= Math.ceil(breakEvenVolume) + 50; i += Math.max(1, Math.ceil(breakEvenVolume / 10))) {
-    const revenue = i * unitPriceNum
-    const totalCost = i * varCostPerUnit + fixedCostPerMonth
-    const profit = revenue - totalCost
-    chartData.push({
-      銷量: i,
-      營業額: Math.round(revenue),
-      總成本: Math.round(totalCost),
-      利潤: Math.round(profit),
-    })
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true)
+    try {
+      const breakEvenVolumeNum = grossMargin > 0 ? Math.ceil(breakEvenVolume) : 0
+      const currentVolumeNum = Math.max(0, Math.round(volumeNum))
+      const currentRevenue = unitPriceNum * currentVolumeNum
+      const currentTotalCost = fixedCostPerMonth + varCostPerUnit * currentVolumeNum
+      const currentProfit = currentRevenue - currentTotalCost
+      const diffToBreakEven = breakEvenVolumeNum - currentVolumeNum
+
+      const conclusion =
+        breakEvenVolumeNum <= 0
+          ? '目前資料不足以計算損益平衡點，請確認每件售價與成本設定。'
+          : diffToBreakEven > 0
+            ? `目前銷量仍低於損益平衡點，仍需增加 ${diffToBreakEven} 件才能達到不虧不賠。`
+            : diffToBreakEven < 0
+              ? `目前銷量已超過損益平衡點 ${Math.abs(diffToBreakEven)} 件，已進入盈利區。`
+              : '目前銷量剛好達到損益平衡點，已達不虧不賠。'
+
+      const formatMoney = (value: number) => `${Math.round(value).toLocaleString()} 元`
+      const formatCount = (value: number) => `${Math.round(value).toLocaleString()} 件`
+
+      const today = new Date()
+      const pad = (value: number) => String(value).padStart(2, '0')
+      const reportDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+      const fileDate = `${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`
+
+      const sampleVolumes = Array.from(
+        new Set([
+          0,
+          Math.max(1, Math.round(currentVolumeNum * 0.5)),
+          currentVolumeNum,
+          breakEvenVolumeNum,
+          breakEvenVolumeNum > 0 ? Math.round(breakEvenVolumeNum * 1.25) : 0,
+        ])
+      )
+        .filter((volume) => volume >= 0)
+        .sort((a, b) => a - b)
+
+      const buildCell = (text: string, isHeader = false) =>
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text, bold: isHeader })],
+            }),
+          ],
+        })
+
+      const summaryTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              buildCell('項目', true),
+              buildCell('數值', true),
+            ],
+          }),
+          new TableRow({
+            children: [buildCell('每件售價'), buildCell(formatMoney(unitPriceNum))],
+          }),
+          new TableRow({
+            children: [buildCell('每件變動成本'), buildCell(formatMoney(varCostPerUnit))],
+          }),
+          new TableRow({
+            children: [buildCell('每月固定成本'), buildCell(formatMoney(fixedCostPerMonth))],
+          }),
+          new TableRow({
+            children: [buildCell('每月銷量'), buildCell(formatCount(currentVolumeNum))],
+          }),
+        ],
+      })
+
+      const kpiTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              buildCell('指標', true),
+              buildCell('結果', true),
+            ],
+          }),
+          new TableRow({
+            children: [buildCell('毛利（每件）'), buildCell(formatMoney(grossMargin))],
+          }),
+          new TableRow({
+            children: [buildCell('毛利率'), buildCell(`${grossMarginRate.toFixed(1)}%`)],
+          }),
+          new TableRow({
+            children: [buildCell('損益平衡點銷量'), buildCell(formatCount(breakEvenVolumeNum))],
+          }),
+          new TableRow({
+            children: [buildCell('損益平衡點營業收入'), buildCell(formatMoney(breakEvenRevenue))],
+          }),
+        ],
+      })
+
+      const chartTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              buildCell('每月銷量（件）', true),
+              buildCell('營業收入', true),
+              buildCell('總成本', true),
+              buildCell('損益', true),
+            ],
+          }),
+          ...sampleVolumes.map((volume) => {
+            const revenue = unitPriceNum * volume
+            const totalCost = fixedCostPerMonth + varCostPerUnit * volume
+            const profit = revenue - totalCost
+
+            return new TableRow({
+              children: [
+                buildCell(formatCount(volume)),
+                buildCell(formatMoney(revenue)),
+                buildCell(formatMoney(totalCost)),
+                buildCell(formatMoney(profit)),
+              ],
+            })
+          }),
+        ],
+      })
+
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph({
+                text: '損益平衡試算報表',
+                heading: HeadingLevel.TITLE,
+                alignment: AlignmentType.CENTER,
+              }),
+              new Paragraph({
+                text: `產出日期：${reportDate}`,
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 240 },
+              }),
+              new Paragraph({
+                text: '你填的數字摘要',
+                heading: HeadingLevel.HEADING_1,
+              }),
+              summaryTable,
+              new Paragraph({ text: '' }),
+              new Paragraph({
+                text: '關鍵指標',
+                heading: HeadingLevel.HEADING_1,
+              }),
+              kpiTable,
+              new Paragraph({ text: '' }),
+              new Paragraph({
+                text: '成本與利潤流動關係',
+                heading: HeadingLevel.HEADING_1,
+              }),
+              new Paragraph({ text: '• 營業收入：每件售價 × 每月銷量' }),
+              new Paragraph({ text: '• 扣掉變動成本後，得到每件毛利' }),
+              new Paragraph({ text: '• 用毛利承擔每月固定成本' }),
+              new Paragraph({ text: '• 達到損益平衡點後，會開始進入盈利' }),
+              new Paragraph({ text: '' }),
+              new Paragraph({
+                text: '損益平衡分析圖',
+                heading: HeadingLevel.HEADING_1,
+              }),
+              new Paragraph({ text: `營業收入線：${formatMoney(unitPriceNum)} × 每月銷量` }),
+              new Paragraph({
+                text: `總成本線：${formatMoney(fixedCostPerMonth)} + ${formatMoney(varCostPerUnit)} × 每月銷量`,
+              }),
+              new Paragraph({
+                text: `損益平衡點：${formatCount(breakEvenVolumeNum)}（對應營業收入約 ${formatMoney(
+                  breakEvenRevenue
+                )}）`,
+              }),
+              new Paragraph({ text: `目前銷量：${formatCount(currentVolumeNum)}` }),
+              new Paragraph({ text: `目前營業收入：${formatMoney(currentRevenue)}` }),
+              new Paragraph({ text: `目前總成本：${formatMoney(currentTotalCost)}` }),
+              new Paragraph({ text: `目前損益：${formatMoney(currentProfit)}` }),
+              new Paragraph({ text: `結論：${conclusion}`, spacing: { after: 200 } }),
+              new Paragraph({
+                text: '分析圖資料（節錄）',
+                heading: HeadingLevel.HEADING_2,
+              }),
+              chartTable,
+            ],
+          },
+        ],
+      })
+
+      const blob = await Packer.toBlob(doc)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `損益平衡分析報表_${fileDate}.docx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('產出報表失敗', error)
+      window.alert('產出報表失敗，請稍後再試。')
+    } finally {
+      setIsGeneratingReport(false)
+    }
   }
 
   return (
@@ -115,7 +344,7 @@ const BreakEvenCalculator = () => {
             {/* AI Assistant Section */}
             <Card className="border-2 border-blue-200 bg-blue-50">
               <CardHeader>
-                <CardTitle className="text-xl text-blue-900">步驟 1：用一句話描述你的生意狀況</CardTitle>
+                <CardTitle className="text-xl text-blue-900">步驟 1：用一段話描述你的生意狀況</CardTitle>
                 <p className="text-sm text-blue-700 mt-2">
                   你可以用語音或直接打字描述，我們會幫你把需要的數字整理出來（此為示意功能）。
                 </p>
@@ -129,6 +358,13 @@ const BreakEvenCalculator = () => {
                 />
 
                 <div className="flex gap-3">
+                  <Button
+                    variant="secondary"
+                    className="text-gray-700"
+                    onClick={handleLoadExample}
+                  >
+                    參考案例
+                  </Button>
                   <Button
                     variant="outline"
                     className="flex items-center gap-2"
@@ -267,7 +503,7 @@ const BreakEvenCalculator = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-gray-700">每件變動成本小計（元）</span>
                           <span className="text-lg font-bold text-blue-600">
-                            {varCostPerUnit.toFixed(0)}
+                            {fmtN(varCostPerUnit)}
                           </span>
                         </div>
                       </CardContent>
@@ -332,7 +568,7 @@ const BreakEvenCalculator = () => {
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-gray-700">每月固定成本小計（元）</span>
                           <span className="text-lg font-bold text-green-600">
-                            {fixedCostPerMonth.toFixed(0)}
+                            {fmtN(fixedCostPerMonth)}
                           </span>
                         </div>
                       </CardContent>
@@ -387,15 +623,15 @@ const BreakEvenCalculator = () => {
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     <p className="text-gray-600">每件售價</p>
-                    <p className="text-xl font-bold text-blue-600">${unitPriceNum.toFixed(0)}</p>
+                    <p className="text-xl font-bold text-blue-600">${fmtN(unitPriceNum)}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     <p className="text-gray-600">每件變動成本</p>
-                    <p className="text-xl font-bold text-blue-600">${varCostPerUnit.toFixed(0)}</p>
+                    <p className="text-xl font-bold text-blue-600">${fmtN(varCostPerUnit)}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     <p className="text-gray-600">每月固定成本</p>
-                    <p className="text-xl font-bold text-blue-600">${fixedCostPerMonth.toFixed(0)}</p>
+                    <p className="text-xl font-bold text-blue-600">${fmtN(fixedCostPerMonth)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -405,15 +641,15 @@ const BreakEvenCalculator = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KPICard
                 title="毛利（每件）"
-                value={`$${grossMargin.toFixed(0)}`}
+                value={`$${fmtN(grossMargin)}`}
                 formula="算法：每件售價－每件變動成本"
-                usage="用途：用來看『賣一件到底剩多少』，是定價與控成本的第一步。"
+                usage="用途：用來看『賣一件可以賺多少錢』，是定價與控成本的第一步。"
               />
               <KPICard
                 title="毛利率"
                 value={`${grossMarginRate.toFixed(1)}%`}
                 formula="算法：毛利 ÷ 每件售價"
-                usage="用途：用來看『每賣 100 元，能留下多少』，越高越能承擔固定成本與波動。"
+                usage="用途：用來看『收入中有多少比例可以留下來』，越高越能承擔固定成本與波動。"
               />
               <KPICard
                 title="損益平衡點（每月）"
@@ -463,20 +699,14 @@ const BreakEvenCalculator = () => {
                 <CardTitle>損益平衡分析圖</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="銷量" label={{ value: '每月銷量（件）', position: 'insideBottomRight', offset: -5 }} />
-                    <YAxis label={{ value: '金額（元）', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip
-                      formatter={(value) => `$${value}`}
-                      labelStyle={{ color: '#000' }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="營業額" stroke="#3b82f6" strokeWidth={2} />
-                    <Line type="monotone" dataKey="總成本" stroke="#ef4444" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
+                <BreakEvenChart
+                  unitPrice={unitPriceNum}
+                  varCostPerUnit={varCostPerUnit}
+                  fixedCostPerMonth={fixedCostPerMonth}
+                  grossMargin={grossMargin}
+                  breakEvenVolume={breakEvenVolume}
+                  currentVolume={volumeNum}
+                />
               </CardContent>
             </Card>
 
@@ -541,18 +771,10 @@ const BreakEvenCalculator = () => {
                   </Button>
                   <Button
                     className="bg-blue-600 hover:bg-blue-700 h-12"
-                    onClick={() => {
-                      const text = `
-損益平衡計算結果：
-毛利（每件）：$${grossMargin.toFixed(0)}
-毛利率：${grossMarginRate.toFixed(1)}%
-損益平衡點營業額：$${breakEvenRevenue.toFixed(0)}
-損益平衡點銷量：${Math.ceil(breakEvenVolume)}件
-                      `
-                      navigator.clipboard.writeText(text)
-                    }}
+                    onClick={handleGenerateReport}
+                    disabled={isGeneratingReport}
                   >
-                    複製結果
+                    {isGeneratingReport ? '產出中...' : '產出報表'}
                   </Button>
                 </div>
               </CardContent>
@@ -639,12 +861,12 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
         <CardContent className="space-y-3">
           <div>
             <p className="text-xs text-gray-600 mb-1">需要的每月營業額（元）</p>
-            <p className="text-2xl font-bold text-orange-600">${breakEvenRevenue.toFixed(0)}</p>
+            <p className="text-2xl font-bold text-orange-600">${Math.ceil(breakEvenRevenue).toLocaleString()}</p>
           </div>
           <Separator className="bg-orange-200" />
           <div>
             <p className="text-xs text-gray-600 mb-1">需要的每月銷量（件）</p>
-            <p className="text-2xl font-bold text-orange-600">{Math.ceil(breakEvenVolume)}</p>
+            <p className="text-2xl font-bold text-orange-600">{Math.ceil(breakEvenVolume).toLocaleString()}</p>
           </div>
           <Separator className="bg-orange-100 my-2" />
           <div className="space-y-2">
