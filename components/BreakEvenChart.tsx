@@ -117,7 +117,8 @@ export default function BreakEvenChart({
     })
   }, [maxX, unitPrice, varCostPerUnit, fixedCostPerMonth])
 
-  const bevY = bev > 0 ? Math.round(bev * unitPrice) : 0
+  const bevAmount = bev > 0 ? Math.round(bev * unitPrice) : 0
+  const bevY = bevAmount
   const zoneHalfWidth = Math.max(maxX * 0.025, 2)
   const bevZoneLeft = bev > 0 ? Math.max(1, bev - zoneHalfWidth) : 0
   const bevZoneRight = bev > 0 ? bev + zoneHalfWidth : 0
@@ -259,7 +260,7 @@ export default function BreakEvenChart({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-[#FFF6D6] border border-yellow-400 inline-block" />
-              損益平衡區
+              損益平衡點
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-[#E9F7EF] border border-green-400 inline-block" />
@@ -290,6 +291,12 @@ export default function BreakEvenChart({
               <div>
                 <p className="text-xs text-gray-500">每月固定成本</p>
                 <p className="text-xl font-bold text-gray-700">{fixedCostPerMonth.toLocaleString()} 元</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">損益平衡點金額</p>
+                <p className="text-xl font-bold text-orange-600">
+                  {bev > 0 ? `${bevAmount.toLocaleString()} 元` : '—'}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">損益平衡銷量</p>

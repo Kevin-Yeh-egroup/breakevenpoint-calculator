@@ -53,6 +53,8 @@ const BreakEvenCalculator = () => {
   const [aiInput, setAiInput] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [isApplyingExample, setIsApplyingExample] = useState(false)
+  const [needsManualConfirm, setNeedsManualConfirm] = useState(false)
 
   // Calculate derived values
   const unitPriceNum = parseFloat(unitPrice) || 0
@@ -77,8 +79,10 @@ const BreakEvenCalculator = () => {
     (parseFloat(fixLoan) || 0) +
     (parseFloat(fixOther) || 0)
 
-  const breakEvenRevenue = grossMarginRate > 0 ? fixedCostPerMonth / (grossMarginRate / 100) : 0
   const breakEvenVolume = grossMargin > 0 ? fixedCostPerMonth / grossMargin : 0
+  const breakEvenVolumeRounded = breakEvenVolume > 0 ? Math.ceil(breakEvenVolume) : 0
+  const breakEvenRevenue =
+    breakEvenVolumeRounded > 0 ? Math.round(breakEvenVolumeRounded * unitPriceNum) : 0
 
   const fmtN = (n: number) => Math.round(n).toLocaleString()
 
@@ -104,17 +108,30 @@ const BreakEvenCalculator = () => {
     setFixOther('300')
   }
 
+  const goToResultsTop = () => {
+    setNeedsManualConfirm(false)
+    setCurrentStep('results')
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    })
+  }
+
   // Mock AI extraction (when user submits)
   const handleAIExtract = () => {
     setAiInput(sampleCaseText)
     applySampleData()
-    setCurrentStep('results')
+    setNeedsManualConfirm(true)
+    setCurrentStep('manual')
   }
 
   const handleLoadExample = () => {
-    setAiInput(sampleCaseText)
-    applySampleData()
-    setCurrentStep('results')
+    setIsApplyingExample(true)
+    window.setTimeout(() => {
+      setAiInput(sampleCaseText)
+      applySampleData()
+      goToResultsTop()
+      setIsApplyingExample(false)
+    }, 180)
   }
 
   // Handle recording button (simulation)
@@ -360,10 +377,11 @@ const BreakEvenCalculator = () => {
                 <div className="flex gap-3">
                   <Button
                     variant="secondary"
-                    className="text-gray-700"
+                    className="text-gray-700 transition-transform duration-150 active:scale-95 active:shadow-inner"
                     onClick={handleLoadExample}
+                    disabled={isApplyingExample}
                   >
-                    參考案例
+                    {isApplyingExample ? '載入案例中...' : '參考案例'}
                   </Button>
                   <Button
                     variant="outline"
@@ -387,7 +405,10 @@ const BreakEvenCalculator = () => {
             <div className="text-center">
               <p className="text-gray-600 mb-4">或直接進行手動輸入</p>
               <Button
-                onClick={() => setCurrentStep('manual')}
+                onClick={() => {
+                  setNeedsManualConfirm(false)
+                  setCurrentStep('manual')
+                }}
                 className="bg-gray-900 hover:bg-gray-800"
               >
                 開始手動輸入
@@ -398,6 +419,14 @@ const BreakEvenCalculator = () => {
 
         {currentStep === 'manual' && (
           <div className="space-y-6">
+            {needsManualConfirm && (
+              <Alert className="bg-amber-50 border-amber-200">
+                <AlertDescription className="text-amber-800">
+                  已幫你整理好初步數字，請先確認內容，再按下「開始試算」查看結果。
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Step 1: Basic Info */}
             <Card>
               <CardHeader>
@@ -581,7 +610,7 @@ const BreakEvenCalculator = () => {
             {/* Action Buttons */}
             <div className="flex gap-3">
               <Button
-                onClick={() => setCurrentStep('results')}
+                onClick={goToResultsTop}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-6 text-base font-semibold"
               >
                 開始試算
@@ -758,7 +787,10 @@ const BreakEvenCalculator = () => {
                   <Button
                     variant="outline"
                     className="h-12"
-                    onClick={() => setCurrentStep('manual')}
+                    onClick={() => {
+                      setNeedsManualConfirm(false)
+                      setCurrentStep('manual')
+                    }}
                   >
                     我想調整數字試試看
                   </Button>
@@ -861,7 +893,7 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
         <CardContent className="space-y-3">
           <div>
             <p className="text-xs text-gray-600 mb-1">需要的每月營業額（元）</p>
-            <p className="text-2xl font-bold text-orange-600">${Math.ceil(breakEvenRevenue).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-orange-600">${breakEvenRevenue.toLocaleString()}</p>
           </div>
           <Separator className="bg-orange-200" />
           <div>
