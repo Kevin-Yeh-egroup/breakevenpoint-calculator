@@ -31,11 +31,11 @@ const BreakEvenCalculator = () => {
   const [unitPrice, setUnitPrice] = useState('')
   const [monthlyVolume, setMonthlyVolume] = useState('')
 
-  // Variable costs per unit
-  const [varRawMaterial, setVarRawMaterial] = useState('')
+  // Variable costs per month
+  const [varMaterials, setVarMaterials] = useState('')
   const [varPackaging, setVarPackaging] = useState('')
-  const [varSupplies, setVarSupplies] = useState('')
-  const [varShipping, setVarShipping] = useState('')
+  const [varLogistics, setVarLogistics] = useState('')
+  const [varPlatformFee, setVarPlatformFee] = useState('')
   const [varOther, setVarOther] = useState('')
 
   // Fixed costs per month
@@ -59,16 +59,19 @@ const BreakEvenCalculator = () => {
   // Calculate derived values
   const unitPriceNum = parseFloat(unitPrice) || 0
   const volumeNum = parseFloat(monthlyVolume) || 0
+  const varMaterialsNum = parseFloat(varMaterials) || 0
+  const varPackagingNum = parseFloat(varPackaging) || 0
+  const varLogisticsNum = parseFloat(varLogistics) || 0
+  const varPlatformFeeNum = parseFloat(varPlatformFee) || 0
+  const varOtherNum = parseFloat(varOther) || 0
 
-  const varCostPerUnit =
-    (parseFloat(varRawMaterial) || 0) +
-    (parseFloat(varPackaging) || 0) +
-    (parseFloat(varSupplies) || 0) +
-    (parseFloat(varShipping) || 0) +
-    (parseFloat(varOther) || 0)
-
-  const grossMargin = unitPriceNum - varCostPerUnit
-  const grossMarginRate = unitPriceNum > 0 ? (grossMargin / unitPriceNum) * 100 : 0
+  const totalSales = unitPriceNum * volumeNum
+  const totalVariableCostNum =
+    varMaterialsNum + varPackagingNum + varLogisticsNum + varPlatformFeeNum + varOtherNum
+  const estimatedVarCostPerUnit = volumeNum > 0 ? totalVariableCostNum / volumeNum : 0
+  const grossMarginPerUnit = unitPriceNum - estimatedVarCostPerUnit
+  const grossProfit = totalSales - totalVariableCostNum
+  const grossMarginRate = totalSales > 0 ? (grossProfit / totalSales) * 100 : 0
 
   const fixedCostPerMonth =
     (parseFloat(fixRent) || 0) +
@@ -79,7 +82,10 @@ const BreakEvenCalculator = () => {
     (parseFloat(fixLoan) || 0) +
     (parseFloat(fixOther) || 0)
 
-  const breakEvenVolume = grossMargin > 0 ? fixedCostPerMonth / grossMargin : 0
+  const breakEvenRevenueByRate =
+    grossMarginRate > 0 ? fixedCostPerMonth / (grossMarginRate / 100) : 0
+  const breakEvenVolume =
+    breakEvenRevenueByRate > 0 && unitPriceNum > 0 ? breakEvenRevenueByRate / unitPriceNum : 0
   const breakEvenVolumeRounded = breakEvenVolume > 0 ? Math.ceil(breakEvenVolume) : 0
   const breakEvenRevenue =
     breakEvenVolumeRounded > 0 ? Math.round(breakEvenVolumeRounded * unitPriceNum) : 0
@@ -87,17 +93,16 @@ const BreakEvenCalculator = () => {
   const fmtN = (n: number) => Math.round(n).toLocaleString()
 
   const sampleCaseText =
-    '我經營手作便當店，每份售價 180 元，每份食材與包材等變動成本約 95 元，每月固定成本約 32,000 元，目前每月大約賣 120 份。'
+    '我經營手作便當店，每份售價 180 元，目前每月大約賣 120 份，每月總變動成本約 11,400 元，每月固定成本約 32,000 元。'
 
   const applySampleData = () => {
     setUnitPrice('180')
     setMonthlyVolume('120')
-
-    setVarRawMaterial('75')
-    setVarPackaging('12')
-    setVarSupplies('5')
-    setVarShipping('3')
-    setVarOther('0')
+    setVarMaterials('7600')
+    setVarPackaging('1200')
+    setVarLogistics('1800')
+    setVarPlatformFee('500')
+    setVarOther('300')
 
     setFixRent('20000')
     setFixStaff('8000')
@@ -149,10 +154,11 @@ const BreakEvenCalculator = () => {
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true)
     try {
-      const breakEvenVolumeNum = grossMargin > 0 ? Math.ceil(breakEvenVolume) : 0
+      const breakEvenVolumeNum = breakEvenRevenueByRate > 0 ? Math.ceil(breakEvenVolume) : 0
       const currentVolumeNum = Math.max(0, Math.round(volumeNum))
       const currentRevenue = unitPriceNum * currentVolumeNum
-      const currentTotalCost = fixedCostPerMonth + varCostPerUnit * currentVolumeNum
+      const currentVariableCost = estimatedVarCostPerUnit * currentVolumeNum
+      const currentTotalCost = fixedCostPerMonth + currentVariableCost
       const currentProfit = currentRevenue - currentTotalCost
       const diffToBreakEven = breakEvenVolumeNum - currentVolumeNum
 
@@ -162,7 +168,7 @@ const BreakEvenCalculator = () => {
           : diffToBreakEven > 0
             ? `目前銷量仍低於損益平衡點，仍需增加 ${diffToBreakEven} 件才能達到不虧不賠。`
             : diffToBreakEven < 0
-              ? `目前銷量已超過損益平衡點 ${Math.abs(diffToBreakEven)} 件，已進入盈利區。`
+              ? `目前銷量已超過損益平衡點 ${Math.abs(diffToBreakEven)} 件，已進入獲利區。`
               : '目前銷量剛好達到損益平衡點，已達不虧不賠。'
 
       const formatMoney = (value: number) => `${Math.round(value).toLocaleString()} 元`
@@ -207,13 +213,22 @@ const BreakEvenCalculator = () => {
             children: [buildCell('每件售價'), buildCell(formatMoney(unitPriceNum))],
           }),
           new TableRow({
-            children: [buildCell('每件變動成本'), buildCell(formatMoney(varCostPerUnit))],
+            children: [buildCell('每月銷量'), buildCell(formatCount(currentVolumeNum))],
+          }),
+          new TableRow({
+            children: [buildCell('每月營業收入'), buildCell(formatMoney(currentRevenue))],
+          }),
+          new TableRow({
+            children: [buildCell('每月總變動成本'), buildCell(formatMoney(totalVariableCostNum))],
+          }),
+          new TableRow({
+            children: [
+              buildCell('推估每件變動成本'),
+              buildCell(volumeNum > 0 ? formatMoney(estimatedVarCostPerUnit) : '需要先填每月銷量'),
+            ],
           }),
           new TableRow({
             children: [buildCell('每月固定成本'), buildCell(formatMoney(fixedCostPerMonth))],
-          }),
-          new TableRow({
-            children: [buildCell('每月銷量'), buildCell(formatCount(currentVolumeNum))],
           }),
         ],
       })
@@ -228,7 +243,7 @@ const BreakEvenCalculator = () => {
             ],
           }),
           new TableRow({
-            children: [buildCell('毛利（每件）'), buildCell(formatMoney(grossMargin))],
+            children: [buildCell('每月毛利'), buildCell(formatMoney(grossProfit))],
           }),
           new TableRow({
             children: [buildCell('毛利率'), buildCell(`${grossMarginRate.toFixed(1)}%`)],
@@ -255,7 +270,7 @@ const BreakEvenCalculator = () => {
           }),
           ...sampleVolumes.map((volume) => {
             const revenue = unitPriceNum * volume
-            const totalCost = fixedCostPerMonth + varCostPerUnit * volume
+            const totalCost = fixedCostPerMonth + estimatedVarCostPerUnit * volume
             const profit = revenue - totalCost
 
             return new TableRow({
@@ -297,13 +312,13 @@ const BreakEvenCalculator = () => {
               kpiTable,
               new Paragraph({ text: '' }),
               new Paragraph({
-                text: '成本與利潤流動關係',
+                text: '成本與獲利流動關係',
                 heading: HeadingLevel.HEADING_1,
               }),
               new Paragraph({ text: '• 營業收入：每件售價 × 每月銷量' }),
-              new Paragraph({ text: '• 扣掉變動成本後，得到每件毛利' }),
-              new Paragraph({ text: '• 用毛利承擔每月固定成本' }),
-              new Paragraph({ text: '• 達到損益平衡點後，會開始進入盈利' }),
+              new Paragraph({ text: '• 扣掉每月總變動成本後，得到每月毛利' }),
+              new Paragraph({ text: '• 用毛利率承擔每月固定成本' }),
+              new Paragraph({ text: '• 達到損益平衡點後，會開始進入獲利' }),
               new Paragraph({ text: '' }),
               new Paragraph({
                 text: '損益平衡分析圖',
@@ -311,7 +326,12 @@ const BreakEvenCalculator = () => {
               }),
               new Paragraph({ text: `營業收入線：${formatMoney(unitPriceNum)} × 每月銷量` }),
               new Paragraph({
-                text: `總成本線：${formatMoney(fixedCostPerMonth)} + ${formatMoney(varCostPerUnit)} × 每月銷量`,
+                text: `推估每件變動成本：${
+                  volumeNum > 0 ? formatMoney(estimatedVarCostPerUnit) : '需要先填每月銷量'
+                }`,
+              }),
+              new Paragraph({
+                text: `總成本線：${formatMoney(fixedCostPerMonth)} + 推估每件變動成本 × 每月銷量`,
               }),
               new Paragraph({
                 text: `損益平衡點：${formatCount(breakEvenVolumeNum)}（對應營業收入約 ${formatMoney(
@@ -372,7 +392,7 @@ const BreakEvenCalculator = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="例：我賣手作蛋糕，一個 250 元，材料大約 60 元。店租每月 12,000 元，水電約 3,000 元。每月大概賣 180 個。"
+                  placeholder="例：我賣手作蛋糕，一個 250 元。每月大概賣 180 個，每月總變動成本約 12,000 元。店租每月 12,000 元，水電約 3,000 元。"
                   className="min-h-24"
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
@@ -484,6 +504,12 @@ const BreakEvenCalculator = () => {
                   <p className="text-xs text-gray-500">平均一個月大概賣多少</p>
                   <p className="text-xs text-gray-400">沒有就填 0</p>
                 </div>
+
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm text-blue-700">每月營業收入（自動計算）</p>
+                  <p className="text-2xl font-bold text-blue-600">${fmtN(totalSales)}</p>
+                  <p className="text-xs text-blue-600 mt-1">算法：每件售價 × 每月銷量</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -502,61 +528,90 @@ const BreakEvenCalculator = () => {
               <CardContent>
                 <Tabs defaultValue="variable" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="variable">變動成本</TabsTrigger>
+                    <TabsTrigger value="variable">總變動成本</TabsTrigger>
                     <TabsTrigger value="fixed">固定成本</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="variable" className="space-y-4">
                     <Alert className="bg-blue-50 border-blue-200">
                       <AlertDescription className="text-blue-800">
-                        變動成本是：賣越多、用越多的成本。沒有就填 0。
+                        請填寫同一月份的各項變動成本，系統會自動加總成「每月總變動成本」。沒有就填 0。
                       </AlertDescription>
                     </Alert>
 
                     <VariableCostCard
-                      title="原料"
-                      helper={showExamples ? '例：咖啡豆、食材、材料、批貨成本' : ''}
-                      value={varRawMaterial}
-                      onChange={setVarRawMaterial}
-                      label="每件原料成本（元）"
+                      title="原料／進貨"
+                      helper={showExamples ? '例：食材、原料、商品採購' : ''}
+                      value={varMaterials}
+                      onChange={setVarMaterials}
+                      label="每月原料／進貨（元）"
                     />
                     <VariableCostCard
-                      title="包材"
-                      helper={showExamples ? '例：塑膠袋、外帶盒、貼紙、標籤' : ''}
+                      title="包材／耗材"
+                      helper={showExamples ? '例：包裝盒、提袋、貼紙、耗材' : ''}
                       value={varPackaging}
                       onChange={setVarPackaging}
-                      label="每件包材成本（元）"
+                      label="每月包材／耗材（元）"
                     />
                     <VariableCostCard
-                      title="耗材"
-                      helper={showExamples ? '例：清潔用品、文具、收據' : ''}
-                      value={varSupplies}
-                      onChange={setVarSupplies}
-                      label="每件耗材成本（元）"
+                      title="物流／運費"
+                      helper={showExamples ? '例：宅配、冷鏈、外送物流' : ''}
+                      value={varLogistics}
+                      onChange={setVarLogistics}
+                      label="每月物流／運費（元）"
                     />
                     <VariableCostCard
-                      title="運費"
-                      helper={showExamples ? '例：宅配、郵資、快遞' : ''}
-                      value={varShipping}
-                      onChange={setVarShipping}
-                      label="每件運費（元）"
+                      title="平台抽成／交易手續費"
+                      helper={showExamples ? '例：電商平台抽成、金流手續費' : ''}
+                      value={varPlatformFee}
+                      onChange={setVarPlatformFee}
+                      label="每月平台抽成／交易手續費（元）"
                     />
                     <VariableCostCard
                       title="變動其他"
-                      helper={showExamples ? '例：加油、擺攤交通、工讀生（若與銷量直接相關）' : ''}
+                      helper={showExamples ? '例：臨時外包、當月才會發生的變動性支出' : ''}
                       value={varOther}
                       onChange={setVarOther}
-                      label="每件其他變動成本（元）"
+                      label="每月變動其他（元）"
                     />
 
                     <Card className="bg-gray-50">
                       <CardContent className="pt-6">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold text-gray-700">每件變動成本小計（元）</span>
+                        <div className="space-y-1 text-sm text-gray-600 mb-3">
+                          <div className="flex justify-between items-center">
+                            <span>原料／進貨</span>
+                            <span>{fmtN(varMaterialsNum)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>包材／耗材</span>
+                            <span>{fmtN(varPackagingNum)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>物流／運費</span>
+                            <span>{fmtN(varLogisticsNum)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>平台抽成／交易手續費</span>
+                            <span>{fmtN(varPlatformFeeNum)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>變動其他</span>
+                            <span>{fmtN(varOtherNum)}</span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-semibold text-gray-700">每月總變動成本（自動加總）</span>
                           <span className="text-lg font-bold text-blue-600">
-                            {fmtN(varCostPerUnit)}
+                            {fmtN(totalVariableCostNum)}
                           </span>
                         </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold text-gray-700">推估每件變動成本（元）</span>
+                          <span className="text-lg font-bold text-blue-600">
+                            {volumeNum > 0 ? fmtN(estimatedVarCostPerUnit) : '—'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">推估方式：每月總變動成本 ÷ 每月銷量</p>
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -641,10 +696,10 @@ const BreakEvenCalculator = () => {
                 onClick={() => {
                   setUnitPrice('')
                   setMonthlyVolume('')
-                  setVarRawMaterial('')
+                  setVarMaterials('')
                   setVarPackaging('')
-                  setVarSupplies('')
-                  setVarShipping('')
+                  setVarLogistics('')
+                  setVarPlatformFee('')
                   setVarOther('')
                   setFixRent('')
                   setFixStaff('')
@@ -671,14 +726,22 @@ const BreakEvenCalculator = () => {
                 <CardTitle>你填的數字摘要</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     <p className="text-gray-600">每件售價</p>
                     <p className="text-xl font-bold text-blue-600">${fmtN(unitPriceNum)}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
-                    <p className="text-gray-600">每件變動成本</p>
-                    <p className="text-xl font-bold text-blue-600">${fmtN(varCostPerUnit)}</p>
+                    <p className="text-gray-600">每月銷量</p>
+                    <p className="text-xl font-bold text-blue-600">{fmtN(volumeNum)} 件</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-blue-100">
+                    <p className="text-gray-600">每月營業收入</p>
+                    <p className="text-xl font-bold text-blue-600">${fmtN(totalSales)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-blue-100">
+                    <p className="text-gray-600">每月總變動成本</p>
+                    <p className="text-xl font-bold text-blue-600">${fmtN(totalVariableCostNum)}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-blue-100">
                     <p className="text-gray-600">每月固定成本</p>
@@ -691,16 +754,16 @@ const BreakEvenCalculator = () => {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KPICard
-                title="毛利（每件）"
-                value={`$${fmtN(grossMargin)}`}
-                formula="算法：每件售價－每件變動成本"
-                usage="用途：用來看『賣一件可以賺多少錢』，是定價與控成本的第一步。"
+                title="每月毛利"
+                value={`$${fmtN(grossProfit)}`}
+                formula="算法：每月營業收入－每月總變動成本"
+                usage="用途：用來看該月份在扣掉變動成本後，還能留下多少錢來承擔固定成本。"
               />
               <KPICard
                 title="毛利率"
                 value={`${grossMarginRate.toFixed(1)}%`}
-                formula="算法：毛利 ÷ 每件售價"
-                usage="用途：用來看『收入中有多少比例可以留下來』，越高越能承擔固定成本與波動。"
+                formula="算法：每月毛利 ÷ 每月營業收入"
+                usage="用途：用來看收入中有多少比例可以留下來，越高越能承擔固定成本與波動。"
               />
               <KPICard
                 title="損益平衡點（每月）"
@@ -716,12 +779,12 @@ const BreakEvenCalculator = () => {
             {/* Flow Diagram */}
             <Card>
               <CardHeader>
-                <CardTitle>成本與利潤流動關係</CardTitle>
+                <CardTitle>成本與獲利流動關係</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-blue-600">營業額</Badge>
+                    <Badge className="bg-blue-600">每月營業收入</Badge>
                     <div className="flex-1 h-1 bg-gray-300"></div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -733,7 +796,7 @@ const BreakEvenCalculator = () => {
                     <div className="flex-1 h-1 bg-gray-300"></div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">用毛利承擔固定成本</span>
+                    <span className="text-sm text-gray-600">用毛利率覆蓋固定成本</span>
                     <div className="flex-1 h-1 bg-gray-300"></div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -752,9 +815,9 @@ const BreakEvenCalculator = () => {
               <CardContent>
                 <BreakEvenChart
                   unitPrice={unitPriceNum}
-                  varCostPerUnit={varCostPerUnit}
+                  varCostPerUnit={estimatedVarCostPerUnit}
                   fixedCostPerMonth={fixedCostPerMonth}
-                  grossMargin={grossMargin}
+                  grossMargin={grossMarginPerUnit}
                   breakEvenVolume={breakEvenVolume}
                   currentVolume={volumeNum}
                 />
@@ -779,9 +842,9 @@ const BreakEvenCalculator = () => {
                   <AccordionItem value="item-2">
                     <AccordionTrigger>毛利率變高會怎樣？</AccordionTrigger>
                     <AccordionContent className="space-y-2">
-                      <p className="text-sm">• 代表每 100 元的營業額中，你能留下更多</p>
+                      <p className="text-sm">• 代表每 100 元的營業收入中，你能留下更多</p>
                       <p className="text-sm">• 對抗市場波動和成本變化的能力更強</p>
-                      <p className="text-sm">• 即使銷量下降，也能維持更好的利潤</p>
+                      <p className="text-sm">• 即使銷量下降，也能維持更好的獲利</p>
                     </AccordionContent>
                   </AccordionItem>
                   <AccordionItem value="item-3">
@@ -914,7 +977,7 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <p className="text-xs text-gray-600 mb-1">需要的每月營業額（元）</p>
+            <p className="text-xs text-gray-600 mb-1">需要的每月營業收入（元）</p>
             <p className="text-2xl font-bold text-orange-600">${breakEvenRevenue.toLocaleString()}</p>
           </div>
           <Separator className="bg-orange-200" />
@@ -924,10 +987,10 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
           </div>
           <Separator className="bg-orange-100 my-2" />
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-700">算法（營業額）：</p>
+            <p className="text-xs font-semibold text-gray-700">算法（營業收入）：</p>
             <p className="text-xs text-gray-600">每月固定成本 ÷ 毛利率</p>
             <p className="text-xs font-semibold text-gray-700 mt-2">算法（銷量）：</p>
-            <p className="text-xs text-gray-600">每月固定成本 ÷ 毛利</p>
+            <p className="text-xs text-gray-600">損益平衡點營業收入 ÷ 每件售價</p>
           </div>
           <Separator className="bg-orange-100 my-2" />
           <p className="text-xs text-gray-700">

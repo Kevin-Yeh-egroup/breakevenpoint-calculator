@@ -8,7 +8,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: '損益平衡計算小工具',
-  description: '幫助小型商家輕鬆計算毛利、毛利率和損益平衡點',
+  description: '幫助小型商家輕鬆計算每月毛利、毛利率和損益平衡點',
   generator: 'v0.app',
   icons: {
     icon: [

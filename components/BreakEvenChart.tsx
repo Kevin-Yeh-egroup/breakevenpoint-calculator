@@ -264,7 +264,7 @@ export default function BreakEvenChart({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-[#E9F7EF] border border-green-400 inline-block" />
-              盈利區
+              獲利區
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-5 h-0.5 bg-blue-500 inline-block rounded" />
@@ -285,7 +285,7 @@ export default function BreakEvenChart({
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3.5">
               <div>
-                <p className="text-xs text-gray-500">每件毛利</p>
+                <p className="text-xs text-gray-500">推估每件毛利</p>
                 <p className="text-xl font-bold text-blue-600">{grossMargin.toFixed(0)} 元</p>
               </div>
               <div>
@@ -293,7 +293,7 @@ export default function BreakEvenChart({
                 <p className="text-xl font-bold text-gray-700">{fixedCostPerMonth.toLocaleString()} 元</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">損益平衡點金額</p>
+                <p className="text-xs text-gray-500">損益平衡點營業收入</p>
                 <p className="text-xl font-bold text-orange-600">
                   {bev > 0 ? `${bevAmount.toLocaleString()} 元` : '—'}
                 </p>
@@ -309,7 +309,7 @@ export default function BreakEvenChart({
               <div className="pt-2.5 border-t border-orange-200">
                 {bev === 0 ? (
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    請輸入有效的售價與成本資料。
+                    請輸入有效的售價、每月銷量與總變動成本資料。
                   </p>
                 ) : belowBreakEven ? (
                   <p className="text-xs text-red-700 leading-relaxed">
@@ -323,7 +323,7 @@ export default function BreakEvenChart({
                   </p>
                 ) : (
                   <p className="text-xs text-yellow-700 leading-relaxed">
-                    恰好達到損益平衡點，剛好不虧不賺。
+                    恰好達到損益平衡點，剛好不虧不賠。
                   </p>
                 )}
               </div>
@@ -374,7 +374,7 @@ export default function BreakEvenChart({
             <br />
             生意剛好把所有成本補回來的位置。
             <br />
-            超過這個位置，每多賣一件都會開始產生利潤。
+            超過這個位置，每多賣一件都會開始產生獲利。
           </p>
         </CardContent>
       </Card>
