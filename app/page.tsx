@@ -243,7 +243,7 @@ const BreakEvenCalculator = () => {
             ],
           }),
           new TableRow({
-            children: [buildCell('每月毛利'), buildCell(formatMoney(grossProfit))],
+            children: [buildCell('每件毛利'), buildCell(formatMoney(grossMarginPerUnit))],
           }),
           new TableRow({
             children: [buildCell('毛利率'), buildCell(`${grossMarginRate.toFixed(1)}%`)],
@@ -316,7 +316,8 @@ const BreakEvenCalculator = () => {
                 heading: HeadingLevel.HEADING_1,
               }),
               new Paragraph({ text: '• 營業收入：每件售價 × 每月銷量' }),
-              new Paragraph({ text: '• 扣掉每月總變動成本後，得到每月毛利' }),
+              new Paragraph({ text: '• 每月毛利：每月營業收入 - 每月總變動成本' }),
+              new Paragraph({ text: '• 每件毛利：每月毛利 ÷ 每月銷量' }),
               new Paragraph({ text: '• 用毛利率承擔每月固定成本' }),
               new Paragraph({ text: '• 達到損益平衡點後，會開始進入獲利' }),
               new Paragraph({ text: '' }),
@@ -509,6 +510,11 @@ const BreakEvenCalculator = () => {
                   <p className="text-sm text-blue-700">每月營業收入（自動計算）</p>
                   <p className="text-2xl font-bold text-blue-600">${fmtN(totalSales)}</p>
                   <p className="text-xs text-blue-600 mt-1">算法：每件售價 × 每月銷量</p>
+                  {unitPriceNum > 0 && volumeNum > 0 && (
+                    <p className="text-xs text-blue-500 mt-0.5">
+                      本案：${fmtN(unitPriceNum)} × {fmtN(volumeNum)} 件 = ${fmtN(totalSales)}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -612,6 +618,11 @@ const BreakEvenCalculator = () => {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-2">推估方式：每月總變動成本 ÷ 每月銷量</p>
+                        {volumeNum > 0 && totalVariableCostNum > 0 && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            本案：${fmtN(totalVariableCostNum)} ÷ {fmtN(volumeNum)} 件 = ${fmtN(estimatedVarCostPerUnit)}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -754,15 +765,28 @@ const BreakEvenCalculator = () => {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KPICard
-                title="每月毛利"
-                value={`$${fmtN(grossProfit)}`}
-                formula="算法：每月營業收入－每月總變動成本"
-                usage="用途：用來看該月份在扣掉變動成本後，還能留下多少錢來承擔固定成本。"
+                title="每件毛利"
+                value={`$${fmtN(grossMarginPerUnit)}`}
+                formula="算法：先算每月毛利（每月營業收入 - 每月總變動成本），再用每月毛利 ÷ 每月銷量"
+                actualFormula={
+                  volumeNum > 0
+                    ? [
+                        `每月毛利 = $${fmtN(totalSales)} − $${fmtN(totalVariableCostNum)} = $${fmtN(grossProfit)}`,
+                        `每件毛利 = $${fmtN(grossProfit)} ÷ ${fmtN(volumeNum)} 件 = $${fmtN(grossMarginPerUnit)}`,
+                      ]
+                    : undefined
+                }
+                usage="用途：用來看每賣出一件商品，扣掉變動成本後能留下多少錢。"
               />
               <KPICard
                 title="毛利率"
                 value={`${grossMarginRate.toFixed(1)}%`}
                 formula="算法：每月毛利 ÷ 每月營業收入"
+                actualFormula={
+                  totalSales > 0
+                    ? [`$${fmtN(grossProfit)} ÷ $${fmtN(totalSales)} = ${grossMarginRate.toFixed(1)}%`]
+                    : undefined
+                }
                 usage="用途：用來看收入中有多少比例可以留下來，越高越能承擔固定成本與波動。"
               />
               <KPICard
@@ -773,6 +797,18 @@ const BreakEvenCalculator = () => {
                 isBreakEven
                 breakEvenRevenue={breakEvenRevenue}
                 breakEvenVolume={breakEvenVolume}
+                breakEvenVolumeActual={
+                  grossMarginPerUnit > 0
+                    ? [
+                        `$${fmtN(fixedCostPerMonth)} ÷ $${fmtN(grossMarginPerUnit)} ≈ ${breakEvenVolume.toFixed(1)} → 進位 = ${breakEvenVolumeRounded} 件`,
+                      ]
+                    : undefined
+                }
+                breakEvenRevenueActual={
+                  breakEvenVolumeRounded > 0
+                    ? [`${breakEvenVolumeRounded} 件 × $${fmtN(unitPriceNum)} = $${fmtN(breakEvenRevenue)}`]
+                    : undefined
+                }
               />
             </div>
 
@@ -968,7 +1004,7 @@ function FixedCostCard({ title, helper, value, onChange, label, subLabel, subVal
   )
 }
 
-function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, breakEvenVolume }) {
+function KPICard({ title, value, formula, usage, actualFormula, isBreakEven, breakEvenRevenue, breakEvenVolume, breakEvenVolumeActual, breakEvenRevenueActual }) {
   if (isBreakEven) {
     return (
       <Card className="border-2 border-orange-200 bg-orange-50">
@@ -987,10 +1023,26 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
           </div>
           <Separator className="bg-orange-100 my-2" />
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-700">算法（營業收入）：</p>
-            <p className="text-xs text-gray-600">每月固定成本 ÷ 毛利率</p>
-            <p className="text-xs font-semibold text-gray-700 mt-2">算法（銷量）：</p>
-            <p className="text-xs text-gray-600">損益平衡點營業收入 ÷ 每件售價</p>
+            <p className="text-xs font-semibold text-gray-700">算法（銷量）：</p>
+            <p className="text-xs text-gray-600">每月固定成本 ÷ 每件毛利（無條件進位）</p>
+            {breakEvenVolumeActual && breakEvenVolumeActual.length > 0 && (
+              <div className="bg-white rounded p-2 border border-orange-200">
+                <p className="text-xs font-semibold text-gray-500 mb-1">本案算式：</p>
+                {breakEvenVolumeActual.map((line, idx) => (
+                  <p key={idx} className="text-xs text-orange-700">{line}</p>
+                ))}
+              </div>
+            )}
+            <p className="text-xs font-semibold text-gray-700 mt-2">算法（營業收入）：</p>
+            <p className="text-xs text-gray-600">損益平衡點銷量 × 每件售價</p>
+            {breakEvenRevenueActual && breakEvenRevenueActual.length > 0 && (
+              <div className="bg-white rounded p-2 border border-orange-200">
+                <p className="text-xs font-semibold text-gray-500 mb-1">本案算式：</p>
+                {breakEvenRevenueActual.map((line, idx) => (
+                  <p key={idx} className="text-xs text-orange-700">{line}</p>
+                ))}
+              </div>
+            )}
           </div>
           <Separator className="bg-orange-100 my-2" />
           <p className="text-xs text-gray-700">
@@ -1011,6 +1063,14 @@ function KPICard({ title, value, formula, usage, isBreakEven, breakEvenRevenue, 
         <Separator className="bg-blue-100" />
         <div className="space-y-2">
           <p className="text-xs font-semibold text-gray-700">{formula}</p>
+          {actualFormula && actualFormula.length > 0 && (
+            <div className="bg-blue-50 rounded p-2 border border-blue-200">
+              <p className="text-xs font-semibold text-gray-500 mb-1">本案算式：</p>
+              {actualFormula.map((line, idx) => (
+                <p key={idx} className="text-xs text-blue-700">{line}</p>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-gray-700">{usage}</p>
         </div>
       </CardContent>
